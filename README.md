@@ -7,7 +7,7 @@ Environment setup can be done in two ways, ether install [Tomcat](https://tomcat
 
 
 ### How to run with Docker
-
+ 
 `docker run -p 8888:8080`
 
 * To mount the volume with the wcloud.war amend the command with the the path were you downloaded the .war file too
