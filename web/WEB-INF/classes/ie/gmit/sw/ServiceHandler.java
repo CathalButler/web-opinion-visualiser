@@ -1,7 +1,7 @@
 package ie.gmit.sw;
 
 
-import ie.gmit.sw.ai.parser.NodeManager;
+import ie.gmit.sw.ai.parser.ServiceManager;
 import ie.gmit.sw.ai.parser.ParserInterface;
 
 import javax.servlet.ServletContext;
@@ -12,6 +12,10 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.URL;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Logger;
 
 /*
  * -------------------------------------------------------------------------------------------------------------------
@@ -39,7 +43,7 @@ public class ServiceHandler extends HttpServlet {
     // === M e m b e r V a r i a b l e s ============================
     private String ignoreWords = null;
     private File f;
-    private ParserInterface parser;
+    private static final Logger LOGGER = Logger.getLogger(ServiceHandler.class.getName());
 
     public void init() throws ServletException {
         ServletContext ctx = getServletContext(); //Get a handle on the application context
@@ -47,11 +51,12 @@ public class ServiceHandler extends HttpServlet {
         //Reads the value from the <context-param> in web.xml
         ignoreWords = getServletContext().getRealPath(File.separator) + ctx.getInitParameter("IGNORE_WORDS_FILE_LOCATION");
         f = new File(ignoreWords); //A file wrapper around the ignore words...
-
         // For now have it start once the application start
         try {
-            new NodeManager("test", 100).go("https://jsoup.org/cookbook/input/parse-document-from-string");
-        } catch (IOException | InterruptedException e) {
+            ServiceManager serviceManager = new ServiceManager("test", 20);
+            serviceManager.go(new URL("https://duckduckgo.com/html?q=ryanair"));
+
+        } catch (IOException | InterruptedException | ExecutionException e) {
             e.printStackTrace();
         }
     }//End method

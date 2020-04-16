@@ -51,6 +51,4 @@ public class WordFrequency implements Comparable<WordFrequency> {
     public String toString() {
         return "Word: " + getWord() + "\tFreq: " + getFrequency() + "\tFont Size: " + getFontSize();
     }
-
-
-}
+}//End class
