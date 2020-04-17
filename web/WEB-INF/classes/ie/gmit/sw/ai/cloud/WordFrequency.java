@@ -11,10 +11,10 @@ package ie.gmit.sw.ai.cloud;
 public class WordFrequency implements Comparable<WordFrequency> {
 
     private String word;
-    private int frequency;
+    private Long frequency;
     private int fontSize = 0;
 
-    public WordFrequency(String word, int frequency) {
+    public WordFrequency(String word, Long frequency) {
         this.word = word;
         this.frequency = frequency;
     }
@@ -27,11 +27,11 @@ public class WordFrequency implements Comparable<WordFrequency> {
         this.word = word;
     }
 
-    public int getFrequency() {
+    public long getFrequency() {
         return this.frequency;
     }
 
-    public void setFrequency(int frequency) {
+    public void setFrequency(Long frequency) {
         this.frequency = frequency;
     }
 
@@ -45,7 +45,7 @@ public class WordFrequency implements Comparable<WordFrequency> {
 
     @Override
     public int compareTo(WordFrequency wordFrequency) {
-        return wordFrequency.frequency - frequency;
+        return (int) (wordFrequency.frequency - frequency);
     }
 
     public String toString() {

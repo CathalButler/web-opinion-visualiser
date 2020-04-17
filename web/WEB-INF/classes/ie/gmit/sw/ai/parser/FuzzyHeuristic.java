@@ -19,7 +19,7 @@ public class FuzzyHeuristic {
 
     //Constructor
     public FuzzyHeuristic(String fclFile) {
-        LOGGER.info("System directory = " + dir);
+//        LOGGER.info("System directory = " + dir);
 
 //        LOGGER.info(fclFile);
 //        File file = new File(dir + fclFile);

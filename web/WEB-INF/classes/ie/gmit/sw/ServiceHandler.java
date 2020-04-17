@@ -1,20 +1,22 @@
 package ie.gmit.sw;
 
 
+import ie.gmit.sw.ai.cloud.LogarithmicSpiralPlacer;
+import ie.gmit.sw.ai.cloud.WeightedFont;
+import ie.gmit.sw.ai.cloud.WordFrequency;
 import ie.gmit.sw.ai.parser.ServiceManager;
-import ie.gmit.sw.ai.parser.ParserInterface;
+import ie.gmit.sw.ai.parser.WordService;
 
+import javax.imageio.ImageIO;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintWriter;
+import java.awt.image.BufferedImage;
+import java.io.*;
 import java.net.URL;
-import java.util.Set;
-import java.util.concurrent.ExecutionException;
+import java.util.*;
 import java.util.logging.Logger;
 
 /*
@@ -44,26 +46,32 @@ public class ServiceHandler extends HttpServlet {
     private String ignoreWords = null;
     private File f;
     private static final Logger LOGGER = Logger.getLogger(ServiceHandler.class.getName());
+    private BufferedImage cloud;
 
     public void init() throws ServletException {
         ServletContext ctx = getServletContext(); //Get a handle on the application context
-
         //Reads the value from the <context-param> in web.xml
         ignoreWords = getServletContext().getRealPath(File.separator) + ctx.getInitParameter("IGNORE_WORDS_FILE_LOCATION");
         f = new File(ignoreWords); //A file wrapper around the ignore words...
-        // For now have it start once the application start
-        try {
-            ServiceManager serviceManager = new ServiceManager("test", 20);
-            serviceManager.go(new URL("https://duckduckgo.com/html?q=ryanair"));
 
-        } catch (IOException | InterruptedException | ExecutionException e) {
-            e.printStackTrace();
-        }
     }//End method
 
     public void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         resp.setContentType("text/html"); //Output the MIME type
         PrintWriter out = resp.getWriter(); //Write out text. We can write out binary too and change the MIME type...
+
+        ServiceManager serviceManager = new ServiceManager("ryanair", 100);
+
+        // For now have it start once the application start
+        try {
+            serviceManager.go(new URL("https://duckduckgo.com/html?q=ryanair"), f.toString());
+
+            cloud = serviceManager.createCloud();
+        } catch (IOException | InterruptedException e) {
+            //LOGGER.info((Supplier<String>) e);
+            e.printStackTrace();
+        }
+
 
         //Initialise some request varuables with the submitted form info. These are local to this method and thread safe...
         String option = req.getParameter("cmbOptions"); //Change options to whatever you think adds value to your assignment...
@@ -85,6 +93,8 @@ public class ServiceHandler extends HttpServlet {
 
         out.print("<p><fieldset><legend><h3>Result</h3></legend>");
 
+        out.print("<img src=\"data:image/png;base64," + encodeToString(cloud) + "\" alt=\"Word Cloud\">");
+
 
         out.print("</fieldset>");
         out.print("<P>Maybe output some search stats here, e.g. max search depth, effective branching factor.....<p>");
@@ -96,4 +106,39 @@ public class ServiceHandler extends HttpServlet {
     public void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         doGet(req, resp);
     }
+
+
+    private String encodeToString(BufferedImage image) {
+        String s = null;
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+
+        try {
+            ImageIO.write(image, "png", bos);
+            byte[] bytes = bos.toByteArray();
+
+            Base64.Encoder encoder = Base64.getEncoder();
+            s = encoder.encodeToString(bytes);
+            bos.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return s;
+    }
+
+    private BufferedImage decodeToImage(String imageString) {
+        BufferedImage image = null;
+        byte[] bytes;
+        try {
+            Base64.Decoder decoder = Base64.getDecoder();
+            bytes = decoder.decode(imageString);
+            ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
+            image = ImageIO.read(bis);
+            bis.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return image;
+    }
+
+
 }//End class

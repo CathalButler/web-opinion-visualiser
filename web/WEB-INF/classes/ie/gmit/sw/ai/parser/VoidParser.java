@@ -16,7 +16,7 @@ import java.util.logging.Logger;
  * TODO - Impalement threads either here or when the class is called
  */
 
-public class VoidParser implements ParserInterface, Runnable {
+public class VoidParser implements ParserInterface {
     // === M e m b e r V a r i a b l e s ============================
     private List<WordFrequency> words = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(VoidParser.class.getName());
@@ -45,21 +45,16 @@ public class VoidParser implements ParserInterface, Runnable {
 
             // Read till EOF and add words to list with a frequency of 1
             while ((line = br.readLine()) != null) {
-                words.add(new WordFrequency(line, 1));
+                words.add(new WordFrequency(line, (long) 1));
             }//Enf while loop
             br.close(); //Close file
             LOGGER.info("Void Word Parsing Complete");
 
             return true; //Complete
         } catch (IOException e) {
-            System.out.print(e.getMessage());
-            e.printStackTrace();
+            LOGGER.info(e.getMessage());
+            // e.printStackTrace();
             return false;
         }//End try catch
     }//End parse method
-
-    @Override
-    public void run() {
-        parse(); //TODO - May be able to improve this
-    }//End run
 }//End class

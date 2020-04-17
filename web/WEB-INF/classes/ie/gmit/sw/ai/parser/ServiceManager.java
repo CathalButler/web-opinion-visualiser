@@ -1,10 +1,22 @@
 package ie.gmit.sw.ai.parser;
 
-import ie.gmit.sw.ai.models.DocumentNode;
+import ie.gmit.sw.ai.cloud.LogarithmicSpiralPlacer;
+import ie.gmit.sw.ai.cloud.WeightedFont;
+import ie.gmit.sw.ai.cloud.WordFrequency;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.logging.Logger;
 
 /**
@@ -16,24 +28,18 @@ public class ServiceManager {
     private static final long PAUSE_TIME = 1000;
     // === M e m b e r V a r i a b l e s =============================
     private int maxPages; // visit 100 pages, then stop
-    private URL urlBase;
     private static final Logger LOGGER = Logger.getLogger(ServiceManager.class.getName());
     //ThreadPool for NodePaser Jobs
     private ExecutorService executorNodeService = Executors.newFixedThreadPool(THREAD_COUNT);
-    //ThreadPool for DocumentParsing
-    private ExecutorService executorDocumentService = Executors.newFixedThreadPool(THREAD_COUNT);
     // Array list of node jobs
     private List<Future<NodeParser>> nodeFutures = new ArrayList<>();
-    // Array list of document jobs
-    private List<Future<DocumentNode>> documentFutures = new ArrayList<>();
-    // Relate words to frequencies
-    private Map<String, Integer> map = new ConcurrentHashMap<>(); // TODO: Map this to WordFrequency Array -- All
     // User will be able to enter a term word when entering a url
     private String searchTerm; // Store search term to refer back to
     // Store nodes visited -- Concurrent version of TreeSet
     private Set<URL> visitedList = new HashSet<>();
-
-    private Queue<DocumentNode> queue = new PriorityQueue<>(Comparator.comparing(DocumentNode::getScore));
+    private WordService wordService = WordService.getInstance();
+    private WordFrequency[] wordFrequencies = new WordFrequency[32];
+    private List<WordFrequency> popularWords = new ArrayList<>();
 
 
     // Constructor
@@ -43,33 +49,22 @@ public class ServiceManager {
     }
 
     /**
-     * Method to start url parsing followed by document parsing
+     * Method to startUrl url parsing followed by document parsing
      */
-    public void go(URL start) throws InterruptedException, ExecutionException {
-
-        //TODO - Stay within the same url?
-        //urlBase = start;
+    public void go(URL startUrl, String voidFile) throws InterruptedException, IOException {
 
         // Start parsing urls using a threaded search
-        submitNewURL(start, 0);
+        createJobs(startUrl);
         while (checkNodes()) ;
+
+        wordService.voidFile(voidFile);
+        wordService.filterWords();
+        wordService.print();
 
         LOGGER.info("Found " + visitedList.size() + " urls");
 
-        // Start parsing documents using a threaded service
-        addDocumentParsingJobs();
-        while (parserDocuments()) ;
-
-        //checkQueue();
-
-        LOGGER.info("Documents Parsed: " + queue.size());
     }//End go
 
-    private void checkQueue() {
-        for (DocumentNode documentNode : queue) {
-            LOGGER.info(documentNode.toString());
-        }
-    }
 
     /**
      * Method which handles the status of the thread pools
@@ -85,143 +80,100 @@ public class ServiceManager {
     private boolean checkNodes() throws InterruptedException {
 
         Thread.sleep(PAUSE_TIME);
-        Set<NodeParser> pageSet = new HashSet<>();
-        Iterator<Future<NodeParser>> iterator = nodeFutures.iterator(); // Grab list of futures waiting to be run
 
         // Loop though jobs (Nodes)
-        while (iterator.hasNext()) {
-            Future<NodeParser> future = iterator.next();
+        // Grab list of futures waiting to be run
+        // If node is complete, remove it and add to page set,
+        // This will add all new urls from that job to this classes list of visted URL,
+        // addNewURLs() will check to see if the site has been visited to stop
+        nodeFutures.removeIf(Future::isDone);
 
-            // If node is complete, remove it and add to page set,
-            // This will add all new urls from that job to this classes list of visted URL,
-            // addNewURLs() will check to see if the site has been visited to stop
-            // duplicates
-            if (future.isDone()) {
-                // PAGE JOBS
-                iterator.remove();
-                try {
-                    pageSet.add(future.get());
-                } catch (ExecutionException e) {
-                    LOGGER.info(e.getMessage());
-                }//End try catch
-            }//End if
-
-        }//End while loop
-
-        // Look thought page set and add the new urls
-        for (NodeParser nodeParser : pageSet) {
-            addNewURLs(nodeParser);
-        }
         return (nodeFutures.size() > 0);
     }//End checkNode method
 
-    /**
-     * Method which handles document parsing jobs
-     *
-     * @return boolean
-     * @throws InterruptedException
-     */
-    private boolean parserDocuments() throws InterruptedException {
-        Thread.sleep(PAUSE_TIME);
-        Iterator<Future<DocumentNode>> documentIterator = documentFutures.iterator(); // Grab document list
-
-        // Once the page paring complete, now I need a search url for term service to start
-        // and loop though a document with jsoup, calculating the frequency and fuzzy business
-        // Loop though jobs (Nodes)
-        while (documentIterator.hasNext()) {
-            Future<DocumentNode> docFuture = documentIterator.next();
-
-            if (docFuture.isDone()) {
-                LOGGER.info("Document Parsing Jobs left " + documentFutures.size());
-                // DOCUMENT JOBS
-                documentIterator.remove(); // Remove job as its starting
-                //Run document job
-                try {
-                    queue.add(docFuture.get()); // Add parsed doc to queue
-                } catch (ExecutionException | InterruptedException e) {
-                    LOGGER.info(e.getMessage());
-                }
-            }
-        }
-
-        return (documentFutures.size() > 0);
-    }
-
-
-    /**
-     * Method gets all urls NodeParser has collected
-     * and submit it to new url, this will check that
-     * it has not been visited before creating a new jobs
-     *
-     * @param nodeParser
-     */
-    private void addNewURLs(NodeParser nodeParser) {
-        for (URL url : nodeParser.getUrlsOnThisPage()) {
-            if (url.toString().contains("#")) {
-                submitNewURL(url, nodeParser.getDepth() + 1);
-            }
-            submitNewURL(url, nodeParser.getDepth() + 1);
-        }
-    }//End method
-
-    /**
-     * Method which creates new document jobs
-     */
-    private void addDocumentParsingJobs() {
-        for (URL url : visitedList) {
-            LOGGER.info(url.toString());
-
-            Future<DocumentNode> futureDocuments = executorDocumentService.submit(new DocumentParser(new DocumentNode(url)));
-            documentFutures.add(futureDocuments);  //Add to queue to be processed
-        }
-    }//End method
 
     /**
      * Method which creates a new node and adds it to the execution queue.
      *
-     * @param url
-     * @param depth
+     * @param url - url to connect to
      */
-    private void submitNewURL(URL url, int depth) {
-        if (shouldVisit(url, depth)) {
-            visitedList.add(url); // Update the visited list as its going to be processed
+    private void createJobs(URL url) throws IOException {
+        //Variables
+        Document document;
+        document = Jsoup.connect(url.toString()).get();
+        Elements elements = document.getElementById("links").getElementsByClass("results_links");
 
-            // Create new job and at to future
-            // Job will run once thread is ready
-            NodeParser nodeParser = new NodeParser(url, depth);
-            Future<NodeParser> future = executorNodeService.submit(nodeParser);
-            nodeFutures.add(future);  //Add to queue to be processed
+        elements.forEach(element -> {
+            Element links = element.getElementsByClass("links_main").first().getElementsByTag("a").first();
+            LOGGER.info("\nURLs: " + links.attr("href"));
 
+            URL jobUrl = null;
+            try {
+                jobUrl = new URL(links.attr("href"));
+            } catch (MalformedURLException e) {
+                LOGGER.info(e.getMessage());
+                //e.printStackTrace();
+                return;
+            }
+
+            if (shouldVisit(jobUrl)) {
+                visitedList.add(url); // Update the visited list as its going to be processed
+
+                // Create new job and at to future
+                // Job will run once thread is ready
+                NodeParser nodeParser = new NodeParser(jobUrl, searchTerm);
+                Future<NodeParser> future = executorNodeService.submit(nodeParser);
+                nodeFutures.add(future);  //Add to queue to be processed
 //            LOGGER.info(String.valueOf(visitedList.size()));
-        }//
+            }//end if
+        });
     }//End method
 
     /**
      * Method which handles checking if a URL should be visited.
      * If the visited list has a url it will return false.
-     * TODO - Add more checks & checks to {@link NodeParser}
      *
      * @param url
-     * @param depth
-     * @return
+     * @return boolean - if job should start on URL provided
      */
-    private boolean shouldVisit(URL url, int depth) {
-
+    private boolean shouldVisit(URL url) {
+        //Check if it has already been visited
         if (visitedList.contains(url)) {
             // LOGGER.info("visitedList.contains(url)");
             return false;
         }
-
-        //TODO - Maybe look at keeping the search inside a single site
-//        if (!url.toString().startsWith(urlBase.toString())) {
-////            LOGGER.info("(!url.toString().startsWith(urlBase.toString())");
-//            return false;
-//        }
-
-        if (url.toString().endsWith(".pdf")) {
-//            LOGGER.info("(url.toString().endsWith(\".pdf\")");
+        //Check if URL contains extensions that aren't valid for our needs
+        if (url.toString().endsWith(".pdf") || url.toString().endsWith("mailto")) {
             return false;
         }
         return visitedList.size() < maxPages;
     }//End method
+
+    public BufferedImage createCloud() {
+        popularWords = wordService.getPopularWords();
+        // Sort the list of popular words
+        Collections.sort(popularWords);
+
+
+        for (int i = 0; i < 32; i++) {
+            LOGGER.info(popularWords.get(i).toString());
+            wordFrequencies[i] = popularWords.get(i);
+        }
+
+        WordFrequency[] words = new WeightedFont().getFontSizes(wordFrequencies);
+        Arrays.sort(words, Comparator.comparing(WordFrequency::getFrequency, Comparator.reverseOrder()));
+
+
+
+        // Spira Mirabilis
+        LogarithmicSpiralPlacer logarithmicSpiralPlacer = new LogarithmicSpiralPlacer(800, 600);
+
+        for (WordFrequency word : words) {
+            // Place each word on the canvas starting with the largest
+            logarithmicSpiralPlacer.place(word);
+        }
+
+        return logarithmicSpiralPlacer.getImage();
+    }//End method
+
 }//End class

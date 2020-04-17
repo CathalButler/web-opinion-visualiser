@@ -1,0 +1,58 @@
+FUNCTION_BLOCK wordcloud
+
+	// Inputs -- Real values to fuzzify
+	VAR_INPUT
+		title : REAL;
+		headings : REAL;
+		body : REAL;
+	END_VAR
+	
+	// Output -- Real value to defuzzify
+	VAR_OUTPUT
+		score : REAL;
+	END_VAR
+	
+	// Fuzzification -- Title
+	FUZZIFY title
+		TERM low := trian 0 2.5 5;
+		TERM medium := trian 2.5 5 7.5;
+		TERM high := trian 5 7.5 10;
+	END_FUZZIFY
+	
+	// Fuzzification -- Headings
+	FUZZIFY headings
+		TERM low := trian 0 2.5 5;
+		TERM medium := trian 2.5 5 7.5;
+		TERM high := trian 5 7.5 10;
+	END_FUZZIFY
+	
+	// Fuzzification -- Body
+	FUZZIFY body
+		TERM low := trian 0 2.5 5;
+		TERM medium := trian 2.5 5 7.5;
+		TERM high := trian 5 7.5 10;
+	END_FUZZIFY
+	
+	// De-fuzzification -- Score
+	DEFUZZIFY score
+		TERM low := trian 0 2.5 5;
+		TERM medium := trian 2.5 5 7.5;
+		TERM high := trian 5 7.5 10;
+		
+		METHOD : COG;		// Use 'Center Of Gravity' defuzzification method
+		DEFAULT := 5;		// Default value is 0 (if no rule activates defuzzifier)
+	END_DEFUZZIFY
+	
+	RULEBLOCK No1
+		AND : MIN;	// Use 'min' for 'and'
+		ACT : MIN;	// Use 'min' activation method
+		ACCU : MAX;	// Use 'max' accumulation method
+		
+		RULE 1 : IF title IS low OR body IS low THEN score IS low;
+		RULE 2 : IF title IS medium AND body IS NOT high THEN score IS medium; 
+		RULE 3 : IF title IS high OR body IS medium THEN score IS high;
+	END_RULEBLOCK
+	
+END_FUNCTION_BLOCK
+		
+		
