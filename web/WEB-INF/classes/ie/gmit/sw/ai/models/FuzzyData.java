@@ -1,7 +1,7 @@
 package ie.gmit.sw.ai.models;
 
 /**
- * Class which is used for create Fuzzy data objects
+ * Class which is used for creating Fuzzy data objects
  *
  * @author Cathal Butler
  */

@@ -2,9 +2,9 @@ package ie.gmit.sw.ai.cloud;
 
 /**
  * Class that defends an object with word and its frequency.
+ * .
+ * References: John Healy - Lecture of the module. Online tutorial videos and lecture content.
  *
- * @author Cathal Butler.
- * Referance: John Healy - Lecture of the module in GMIT. Online tutorial videos and lecture content.
  * @implmentes Comparable to compare the frequency of the word with another.
  */
 

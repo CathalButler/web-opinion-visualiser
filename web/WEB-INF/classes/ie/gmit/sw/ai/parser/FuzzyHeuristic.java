@@ -5,36 +5,23 @@ import net.sourceforge.jFuzzyLogic.FIS;
 import net.sourceforge.jFuzzyLogic.FunctionBlock;
 import net.sourceforge.jFuzzyLogic.rule.Variable;
 
-import java.io.File;
 import java.util.logging.Logger;
 
 /**
+ * This class handles reading the FLC and return the fuzzy score
+ * based on the inputs against the rules in the FLC file.
+ *
  * @author Cathal Butler
  */
 public class FuzzyHeuristic {
     // === M e m b e r V a r i a b l e s =============================
     private final FIS fis;
     private static final Logger LOGGER = Logger.getLogger(FuzzyHeuristic.class.getName());
-    final String dir = System.getProperty("user.dir"); //TODO - Need to test deployment on another platform due to path
+//    final String dir = System.getProperty("user.dir");
 
     //Constructor
     public FuzzyHeuristic(String fclFile) {
-//        LOGGER.info("System directory = " + dir);
-
-//        LOGGER.info(fclFile);
-//        File file = new File(dir + fclFile);
-//        LOGGER.info(String.valueOf(file.exists()));
-        this.fis = FIS.load(dir + fclFile, true);
-    }
-
-    /**
-     * Method which returns an instance of this class
-     *
-     * @param fclFile - FCL file to be read
-     * @return FuzzyHeuristic Instances
-     */
-    public static FuzzyHeuristic fuzzyHeuristic(String fclFile) {
-        return new FuzzyHeuristic(fclFile);
+        this.fis = FIS.load(fclFile, true);
     }
 
     public double process(FuzzyData fuzzyData) {
@@ -52,8 +39,6 @@ public class FuzzyHeuristic {
         // Show output variable's chart
         Variable score = fb.getVariable("score");
 
-        double result = score.getLatestDefuzzifiedValue();
-
-        return result;
-    }
+        return score.getLatestDefuzzifiedValue();
+    }//End process method
 }//End class

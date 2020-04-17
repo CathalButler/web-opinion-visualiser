@@ -1,6 +1,7 @@
 package ie.gmit.sw.ai.parser;
 
 import ie.gmit.sw.ai.models.FuzzyData;
+import ie.gmit.sw.ai.services.WordService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -8,46 +9,50 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.net.URL;
-import java.util.*;
+import java.util.HashSet;
+import java.util.PriorityQueue;
+import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * This Node class handles parsing a webpage for urls
+ * This Node class handles parsing a web pages.
  * Class implements {@link Callable} interface
- * TODO - Implement depth
  *
  * @author Cathal Butler
  */
 
 public class NodeParser implements Callable<NodeParser> {
     // == C O N S T A N T S ==========================================
-    static final int TIMEOUT = 60000;   // one minute
     private static final int TITLE_WEIGHT = 50;
     private static final int H1_WEIGHT = 20;
     private static final int P_WEIGHT = 1;
-    private static final int MAX = 10; // visit 100 pages, then stop
+    private static final int MAX = 10; //Max amout of nested web pages a thread can parse
+    private static final double THRESHOLD = 5;
     // === M e m b e r V a r i a b l e s =============================
-    private URL url;
-    private String searchTerm;
-    private Set<URL> nestedURls = new HashSet<>(); // URL that are found within a page
     private static final Logger LOGGER = Logger.getLogger(NodeParser.class.getName());
-    private Queue<Document> queue = new PriorityQueue<>();
     private Set<String> closedList = new ConcurrentSkipListSet<>();
     private WordService wordService = WordService.getInstance();
+    private Queue<Document> queue = new PriorityQueue<>();
+    private FuzzyHeuristic fuzzyHeuristic;
+    private String searchTerm;
+    private URL url;
     private double score = 5;
     private int titleScore = 0;
     private int headingScore = 0;
     private int bodyScore = 0;
 
     // Constructor
-    public NodeParser(URL url, String searchTerm) {
+    public NodeParser(URL url, String searchTerm, FuzzyHeuristic fuzzyHeuristic) {
         this.url = url;
         this.searchTerm = searchTerm;
+        this.fuzzyHeuristic = fuzzyHeuristic;
     }
 
     @Override
@@ -66,86 +71,86 @@ public class NodeParser implements Callable<NodeParser> {
     }
 
     /**
-     * Method process a URL passed to it using jsoup, all other URL on that web page are collected
-     * and returned
+     * Method process parsing and scoring documents on this thread
+     * If a nested URL contains search term continue...
+     * If the new document scores is greater then the set threshold add the body of the document words to {@link WordService}
+     * Update nestedURL for states
+     * Add new document to queue
      */
     private void processLinksForEach() {
 
-        //Elements links = document.select("a[href]"); // Get hyperlink elements
         while (closedList.size() <= MAX && !queue.isEmpty()) {
-            //String href = link.attr("href"); // just href
-            //String newLink = link.absUrl("href"); // get absolute link
-            //LOGGER.info(String.valueOf(docs.size()));
-            Document doc = queue.poll();
+            Document doc = queue.poll(); // Grab a document
             Elements element = doc.select("a[href]");
 
             addWordsToList(doc.body().text());
             element.forEach(elem -> {
                 String newLink = elem.absUrl("href"); // get absolute link
-                //LOGGER.info(newLink + " -> Nesteed left " + nestedURls.size());
+
                 try {
                     if (newLink != null && !closedList.contains(newLink) && closedList.size() <= MAX) {
                         // Check for search term
                         if (newLink.contains(searchTerm)) {
-                            LOGGER.info("======== HAS SEARCH TERM ============");
-                            Document nestedDoc = Jsoup.connect(newLink).get();
+//                            LOGGER.info("======== HAS SEARCH TERM ============");
+//                            LOGGER.info(newLink);
+                            // Needed to add user agent to stop timeouts on some sites
+                            Document nestedDoc = Jsoup.connect(newLink)
+                                    .userAgent("Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:25.0) Gecko/20100101 Firefox/25.0")
+                                    .ignoreHttpErrors(true)
+                                    .timeout(0).get();
 
                             closedList.add(newLink);
 
-                            if (getHeuristicScore(nestedDoc) >= score) {
+                            // Check the heuristic score of the document
+                            // if it is greater then or = to the set score
+                            // process it
+                            if (getHeuristicScore(nestedDoc) >= THRESHOLD) {
                                 addWordsToList(nestedDoc.body().text());
 
                                 LOGGER.info("CLOSED LIST SIZE " + closedList.size());
-
-                                nestedURls.add(new URL(newLink));
                                 queue.offer(nestedDoc);
-
                             }
+                            LOGGER.info("Not within threshold boundary");
                         }
                     }
                 } catch (IOException e) {
+//                    e.printStackTrace();
                     LOGGER.info("Couldn't Process: " + e.getMessage());
-                    return;
+//                    return;
                 }
             });
         }//End foreach
-
-
-        LOGGER.info("NESTED URL SIZE -> " + nestedURls.size());
     }//End method
 
     /**
-     * Method which adds and there fre
+     * Method which adds to the {@link WordService} class.
+     * Words are abstracted from the document.body.text()
      *
-     * @param parserInput
+     * @param parserInput - document element
      */
     private void addWordsToList(String parserInput) {
 
-        // Collect all words and there frequency (how many there is in a given sentence)
+        Pattern pattern = Pattern.compile("[a-z]");
+
+        // Collect all words and count them
+        // filter, only [a-z]
         Stream<String> stream = Stream.of(parserInput.
                 toLowerCase()
                 .split("\\W+"))
+                .filter(pattern.asPredicate())
                 .parallel();
 
-//            long uniqueWordCount = Stream.of(parserInput)
-//                    .map(String::toLowerCase)
-//                    .collect(Collectors.groupingBy(w -> w, Collectors.counting()))
-//                    .entrySet().stream()
-//                    .filter(e -> e.getValue() == 1)
-//                    .count();
-
-//            wordService.updateWordList(uniqueWordCount);
-
         //Pass them onto word service
+        //Staying safe with ConcurrentHashMap
         wordService.updateWordList(stream.collect(
                 Collectors.groupingBy(String::toString,
                         ConcurrentHashMap::new,
                         Collectors.counting())));
-    }//End method
+    }//End addWordsToList method
 
 
     /**
-     * Method that calculates heuristic scores on Document elements.
+     * Method that calculates heuristic scores on elements in a Document.
      *
      * @param doc - Jsoup Document
      * @return Fuzzy score
@@ -153,30 +158,32 @@ public class NodeParser implements Callable<NodeParser> {
     private double getHeuristicScore(Document doc) {
         // Title
         String title = doc.title();
-        //CALCULATIONS FOR HEURISTIC
-        titleScore += (int) (getFrequency(title) * TITLE_WEIGHT); // Calculate heuristic
+        titleScore += (int) (getFrequency(title) * TITLE_WEIGHT);
 
         // Heading
-        Elements headings = doc.select("h1"); // Walk jsoup tree
+        Elements headings = doc.select("h1, h2, h3, h4");
         for (Element heading : headings) {
-            String h1 = heading.text(); // Gives text inside heading
+            String h1 = heading.text();
             LOGGER.info("\t" + h1);
-            headingScore += getFrequency(h1) * H1_WEIGHT; // Calculate heuristic
+            headingScore += getFrequency(h1) * H1_WEIGHT;
         }
 
-        String body = doc.body().text(); // Grab text from body
-        bodyScore = (int) (getFrequency(body) * P_WEIGHT);  // Calculate heuristic
+        //Body
+        String body = doc.body().text();
+        bodyScore = (int) (getFrequency(body) * P_WEIGHT);
 
+        // Output states before fuzzy business
         LOGGER.info("\n=========================" +
                 "\nScores before fuzzy" +
                 "\nTitle Score:\t" + titleScore
                 + "\nHeading Score:\t" + headingScore
                 + "\nBody Score:\t" + bodyScore + "\n=========================");
 
+        // Get the FuzzyHeuristic Score
         score = getFuzzyHeuristic(titleScore, headingScore, bodyScore);
 
         return score; // return score after computation
-    }
+    }//End getHeuristicScore method
 
     /**
      * This method handles get the fuzzy score
@@ -187,33 +194,32 @@ public class NodeParser implements Callable<NodeParser> {
      * @return fuzzy score
      */
     private double getFuzzyHeuristic(int title, int headings, int body) {
-        FuzzyHeuristic fuzzyHeuristic = new FuzzyHeuristic("/webapps/wcloud/res/WordCloud.fcl");
+//        FuzzyHeuristic fuzzyHeuristic = new FuzzyHeuristic("/webapps/wcloud/res/WordCloud.fcl");
         double score = fuzzyHeuristic.process(new FuzzyData(title, headings, body));
         LOGGER.info(
                 "\n========================" +
                         "\nFuzzy Score:  " + score +
                         "\n========================");
         return score;
-    }
+    }//End getFuzzyHeuristic method
 
     /**
      * This get the frequency of words in a string, add the words to a list and return an amount to the user
      * https://stackoverflow.com/questions/21771566/calculating-frequency-of-each-word-in-a-sentence-in-java
      * https://www.logicbig.com/how-to/code-snippets/jcode-java-8-streams-collectors-groupingby.html
+     * https://www.geeksforgeeks.org/stream-in-java/
      *
      * @param parserInput - Document string
-     * @return
+     * @return the frequency of the search term in the input
      */
     private long getFrequency(String parserInput) {
-
-
-        // Collect all words and there frequency (how many there is in a given sentence)
+        // Lower string case, chop string into words
         Stream<String> stream = Stream.of(parserInput.
                 toLowerCase()
                 .split("\\W+"))
                 .parallel();
 
-        // Convert to ConcurrentHashMap & Filter
+        // Convert to ConcurrentHashMap & count words
         ConcurrentHashMap<String, Long> localWordFreq = stream.collect(
                 Collectors.groupingBy(String::toString,
                         ConcurrentHashMap::new,
@@ -222,19 +228,10 @@ public class NodeParser implements Callable<NodeParser> {
 
         // localWordFreq.values().stream().forEach(LOGGER::info);
         //Check for search term in this localWordFreq
-
         // If word is in list, return the amount of times
         if (localWordFreq.containsKey(searchTerm)) {
-
-            LOGGER.info("Size of the map -> " + (localWordFreq.size()));
-            LOGGER.info("Word frequency in map -> " + localWordFreq.get(searchTerm));
-
             return localWordFreq.get(searchTerm);
         }
-
-        //TODO - Look at returning this to manager class
-
-        // LOGGER.info(String.valueOf(localWordFreq.size()));
         return 0;
-    }
+    }//End getInstance method
 }//End class

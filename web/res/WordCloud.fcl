@@ -51,6 +51,7 @@ FUNCTION_BLOCK wordcloud
 		RULE 1 : IF title IS low OR body IS low THEN score IS low;
 		RULE 2 : IF title IS medium AND body IS NOT high THEN score IS medium; 
 		RULE 3 : IF title IS high OR body IS medium THEN score IS high;
+		RULE 4 : IF headings IS frequent AND body IS prevalent THEN score IS high;
 	END_RULEBLOCK
 	
 END_FUNCTION_BLOCK

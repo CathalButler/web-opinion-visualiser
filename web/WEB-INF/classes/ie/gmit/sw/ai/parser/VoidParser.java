@@ -12,8 +12,6 @@ import java.util.logging.Logger;
  * when create a Word Cloud
  *
  * @author Cathal Butler
- * <p>
- * TODO - Impalement threads either here or when the class is called
  */
 
 public class VoidParser implements ParserInterface {
