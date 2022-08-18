@@ -2,7 +2,6 @@ package ie.gmit.sw;
 
 
 import ie.gmit.sw.ai.services.ServiceManager;
-import ie.gmit.sw.ai.services.WordService;
 
 import javax.imageio.ImageIO;
 import javax.servlet.ServletContext;
@@ -51,7 +50,7 @@ public class ServiceHandler extends HttpServlet {
         resp.setContentType("text/html"); //Output the MIME type
         PrintWriter out = resp.getWriter(); //Write out text. We can write out binary too and change the MIME type...
 
-        //Initialise some request varuables with the submitted form info. These are local to this method and thread safe...
+        //Initialise some request variables with the submitted form info. These are local to this method and thread safe...
         String option = req.getParameter("sizeOptions"); //Change options to whatever you think adds value to your assignment...
         String searchTerm = req.getParameter("query");
 
@@ -68,7 +67,6 @@ public class ServiceHandler extends HttpServlet {
             case "256":
                 cloudSize = 256;
                 break;
-
         }
 
         // Create new instance of ServiceManager, this handles the threaded search

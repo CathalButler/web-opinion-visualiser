@@ -73,7 +73,7 @@ public class ServiceManager {
         // Filter words, make sure no ignore words are present
         wordService.filterWords();
 //        wordService.print(); // For testing
-        LOGGER.info("Found " + visitedList.size() + " urls");
+//        LOGGER.info("Found " + visitedList.size() + " urls");
     }//End go
 
 
@@ -104,7 +104,7 @@ public class ServiceManager {
     /**
      * Method which creates a new search node and adds it to the execution queue.
      * This method is called first, it searches the search term on duckduckgo and
-     * grabs the links found. Them URLs are looped though creating thread jobs
+     * grabs the links found. The URLs are looped though creating thread jobs
      * that {@link NodeParser} looks after.
      *
      * @param url - url to connect to
@@ -154,7 +154,7 @@ public class ServiceManager {
 
     /**
      * Method which handles checking if a URL should be visited.
-     * If the visited list has a url it will return false.
+     * If the visited list has an url it will return false.
      *
      * @param url
      * @return boolean - if job should start on URL provided

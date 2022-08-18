@@ -33,7 +33,7 @@ public class NodeParser implements Callable<NodeParser> {
     private static final int TITLE_WEIGHT = 50;
     private static final int H1_WEIGHT = 20;
     private static final int P_WEIGHT = 1;
-    private static final int MAX = 10; //Max amout of nested web pages a thread can parse
+    private static final int MAX = 10; //Max amount of nested web pages a thread can parse
     private static final double THRESHOLD = 5;
     // === M e m b e r V a r i a b l e s =============================
     private static final Logger LOGGER = Logger.getLogger(NodeParser.class.getName());
@@ -68,16 +68,19 @@ public class NodeParser implements Callable<NodeParser> {
 
         processLinksForEach();
         return this;
+
     }
 
     /**
      * Method process parsing and scoring documents on this thread
      * If a nested URL contains search term continue...
-     * If the new document scores is greater then the set threshold add the body of the document words to {@link WordService}
+     * If the new document scores is greater than the set threshold add the body of the document words to {@link WordService}
      * Update nestedURL for states
      * Add new document to queue
      */
     private void processLinksForEach() {
+
+        LOGGER.info("Queue Size: " + queue.size());
 
         while (closedList.size() <= MAX && !queue.isEmpty()) {
             Document doc = queue.poll(); // Grab a document
@@ -86,6 +89,8 @@ public class NodeParser implements Callable<NodeParser> {
             addWordsToList(doc.body().text());
             element.forEach(elem -> {
                 String newLink = elem.absUrl("href"); // get absolute link
+
+                LOGGER.info(newLink);
 
                 try {
                     if (newLink != null && !closedList.contains(newLink) && closedList.size() <= MAX) {
@@ -102,7 +107,7 @@ public class NodeParser implements Callable<NodeParser> {
                             closedList.add(newLink);
 
                             // Check the heuristic score of the document
-                            // if it is greater then or = to the set score
+                            // if it is greater than or = to the set score
                             // process it
                             if (getHeuristicScore(nestedDoc) >= THRESHOLD) {
                                 addWordsToList(nestedDoc.body().text());
