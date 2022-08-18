@@ -9,7 +9,7 @@ Environment setup can be done in two ways, either install [Tomcat](https://tomca
 **Must use Java 8**<br>
 Compile Java classes with needed Jar inside`./web/WEB-INF/lib` set in the classpath:<br>
 * First cd into the classes folder: `cd web/WEB-INF/classes`
-* Then run compile the classes and use find and grep to location `.java` file: `javac -cp ".:../lib/*" $(find ./* | grep .java)`
+* Then run compile the classes and use find and grep to location `.java` files: `javac -cp ".:../lib/*" $(find ./* | grep .java)`
 * Finally, create the jar by running: `jar -cf ../wcloud.war *`
 
 ### How to run with Docker
